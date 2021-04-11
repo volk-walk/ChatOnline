@@ -4,6 +4,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 
 public class ClientHandler {
     private Server server;
@@ -11,6 +12,7 @@ public class ClientHandler {
     private DataInputStream in;
     private DataOutputStream out;
     private String nickname;
+    private String login;
 
 
     public ClientHandler (Server server, Socket socket){
@@ -25,30 +27,60 @@ public class ClientHandler {
             new Thread(() -> {
                 try {
 
+                    socket.setSoTimeout(120000);
+
                     while (true) {
 
                         String clientMessage = in.readUTF();
                         //при отправке "/end" закрываем соединение
                         if (clientMessage.equals("/end")) {
                             out.writeUTF("/end");
-                            break;
+                            throw new RuntimeException("Клиент рещил выйти");
                         }
+                            // Аутентификация
+                        if (clientMessage.startsWith("/auth")) {
 
-                        if (clientMessage.startsWith("/auth")){
+                            String[] token = clientMessage.split("\\s+",3);
+                            if(token.length<3){
+                                continue;
+                            }
 
-                            String [] token = clientMessage.split("\\s+");
                             String newNick = server
                                     .getAuthService()
-                                    .getNicknameByLoginAndPassword(token[1],token[2] );
-                            if (newNick != null){
-                                nickname = newNick;
-                                sendMessage("/auth_okay " + nickname);
-                                server.subscribe(this);
-                                System.out.println("Клиент аутентифицировался. Никнейм "+ nickname +
-                                        " Адрес: " + socket.getRemoteSocketAddress());
-                                break;
+                                    .getNicknameByLoginAndPassword(token[1], token[2]);
+                            if (newNick != null) {
+                                login = token[1];
+                                if (!server.LoginIsAuticated(login)) {
+                                    nickname = newNick;
+                                    sendMessage("/auth_okay " + nickname);
+                                    socket.setSoTimeout(0);
+                                    server.subscribe(this);
+                                    System.out.println("Клиент аутентифицировался. Никнейм " + nickname +
+                                            " Адрес: " + socket.getRemoteSocketAddress());
+                                    break;
+                                } else {
+                                    sendMessage("С таким логином уже зашли" + "\n");
+                                }
+
+                            } else {
+                                sendMessage("Неверный логин или пароль" + "\n");
+                            }
+
+                        }
+
+
+                        //Регистрация
+                        if (clientMessage.startsWith("/reg")) {
+                            String[] token = clientMessage.split("\\s+", 4);
+                            if(token.length<4){
+                                continue;
+                            }
+                            boolean b = server.getAuthService()
+                                    .registration(token[1],token[2],token[3]);
+                            if (b){
+                                sendMessage("/reg_ok");
                             }else{
-                                sendMessage("Неверный логин или пароль" +"\n");
+                                sendMessage("/reg_no");
                             }
                         }
                     }
@@ -64,12 +96,26 @@ public class ClientHandler {
                             out.writeUTF("/end");
                             break;
                         }
+                        if (clientMessage.startsWith("/w")) {
+                            String[] token = clientMessage.split("\\s+", 3);
+                            server.PrivateMessage(this, token[1], token[2]);
+                        } else {
+                            server.broadcastMessage(this, clientMessage);
+                        }
 
-                        server.broadcastMessage(this, clientMessage);
+
                     }
-                } catch (IOException e) {
+                }catch (SocketTimeoutException e){
+                    try {
+                        out.writeUTF("/end");
+                    } catch (IOException ioException) {
+                        ioException.printStackTrace();
+                    }
+                }catch (RuntimeException e){
+                    System.out.println(e.getMessage());
+                }catch (IOException e) {
                     e.printStackTrace();
-                } finally {
+                }finally {
 
                     server.unsubscribe(this);
                     System.out.println("Client " +socket.getRemoteSocketAddress() + " disconnect");
@@ -80,6 +126,8 @@ public class ClientHandler {
                     }
                 }
             }).start();
+
+
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -96,5 +144,9 @@ public class ClientHandler {
 
     public String getNickname() {
         return nickname;
+    }
+
+    public String getLogin() {
+        return login;
     }
 }

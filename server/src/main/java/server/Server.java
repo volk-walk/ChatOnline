@@ -52,17 +52,47 @@ private AuthService authService;
             c.sendMessage(message);
         }
     }
+    public void PrivateMessage(ClientHandler sender,String recipient, String msg) {
+        String message = String.format("%s: %s", sender.getNickname(), msg);
+        for (ClientHandler c : clients) {
+            if(recipient.equals(c.getNickname())){
+                c.sendMessage(message);
+                sender.sendMessage(message);
+            }
+        }
+
+    }
 
     public void subscribe(ClientHandler clientHandler) {
         clients.add(clientHandler);
+        broadcastClientList();
     }
 
     public void unsubscribe(ClientHandler clientHandler) {
         clients.remove(clientHandler);
+        broadcastClientList();
     }
 
     public AuthService getAuthService() {
         return authService;
+    }
+    public boolean LoginIsAuticated(String login){
+        for (ClientHandler c:clients) {
+            if (login.equals(c.getLogin())){
+                return true;
+            }
+        }
+        return false;
+    }
+    public void broadcastClientList(){
+        StringBuilder sb = new StringBuilder("/clientList");
+        for (ClientHandler c:clients) {
+            sb.append(" ").append(c.getNickname());
+            }
+        String message = sb.toString();
+        for (ClientHandler c:clients) {
+           c.sendMessage(message);
+        }
     }
 }
 
