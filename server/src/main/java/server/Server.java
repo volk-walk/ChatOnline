@@ -16,8 +16,9 @@ private AuthService authService;
 
     public Server() {
 
+        authService = new DBconection();
         clients = new CopyOnWriteArrayList<>();
-        authService = new SimpleAuthService();
+//        authService = new SimpleAuthService();
         try {
 
             server =  new ServerSocket (PORT);

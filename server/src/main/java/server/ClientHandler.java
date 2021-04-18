@@ -102,6 +102,12 @@ public class ClientHandler {
                         } else {
                             server.broadcastMessage(this, clientMessage);
                         }
+//                        смена никнейма
+                        if (clientMessage.startsWith("/change")){
+                            String [] token = clientMessage.split("\\s+",3);
+
+                            boolean c = server.getAuthService().changeNick(token[1],this.nickname);
+                        }
 
 
                     }
@@ -133,6 +139,8 @@ public class ClientHandler {
         }
 
     }
+
+
 
     public void sendMessage (String msg){
         try {
