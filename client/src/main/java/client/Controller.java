@@ -3,7 +3,6 @@ package client;
 
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
-import javafx.event.Event;
 import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -20,11 +19,14 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.stage.WindowEvent;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.Socket;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
 import java.util.ResourceBundle;
 
 public class Controller implements Initializable {
@@ -52,6 +54,8 @@ public class Controller implements Initializable {
     private Stage stage;
     private Stage regStage;
     private Regcontroller regcontroller;
+    private FileOutputStream historyMsg;
+
 
 
     public void setAuthenticated(boolean authenticated) {
@@ -97,6 +101,7 @@ public class Controller implements Initializable {
             socket = new Socket(IP_ADDRESS, PORT);
             in = new DataInputStream(socket.getInputStream());
             out = new DataOutputStream(socket.getOutputStream());
+            String pathHistory = String.format("historyMsg/history_%s.txt", loginField.getText());
 
 
             new Thread(() -> {
@@ -115,6 +120,7 @@ public class Controller implements Initializable {
                             if (str.startsWith("/auth_okay")){
                                 nickname = str.split("\\s+")[1];
                                 setAuthenticated(true);
+                                historyMsg = new FileOutputStream(pathHistory,true);
                                 break;
                             }
                             if (str.startsWith("/reg_ok")){
@@ -132,8 +138,13 @@ public class Controller implements Initializable {
                     }
 
                     //цикл работы окна отправки сообщений
+
+                    for (String q:Files.readAllLines(Paths.get(pathHistory))) {
+                        textArea.appendText( q + "\n");
+                    }
                     while (authenticated) {
                         String str = in.readUTF();
+                        String msgForHistory =  str + "\n";
                         if(str.startsWith("/")){
                             if (str.equals("/end")) {
                                 System.out.println("disconnect");
@@ -151,6 +162,7 @@ public class Controller implements Initializable {
                             }
 
                         }else {
+                            historyMsg.write(msgForHistory.getBytes());
                             textArea.appendText(str + "\n");
                         }
 
@@ -253,4 +265,5 @@ public class Controller implements Initializable {
             e.printStackTrace();
         }
     }
+
 }
